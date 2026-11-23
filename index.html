@@ -6,13 +6,8 @@
   <title>繪本 AR</title>
 
   <!-- AR 函式庫（MindAR 開源圖像辨識 + A-Frame） -->
-  <script src="https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/dist/mindar-image.prod.js"></script>
-  <script>
-    // 先把「圖片辨識編譯器」存起來，之後若沒有 targets.mind 檔，可以直接在手機上編譯
-    window.__MindARCompiler = (window.MINDAR && window.MINDAR.IMAGE && window.MINDAR.IMAGE.Compiler) || null;
-  </script>
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 
   <!-- 頁面設定（新增頁面請改 pages.js） -->
   <script src="pages.js"></script>
@@ -86,8 +81,15 @@
         }
       } catch (e) { /* 沒有檔案就改用即時編譯 */ }
 
-      const Compiler = window.__MindARCompiler;
-      if (!Compiler) throw new Error("AR 元件載入失敗，請檢查網路後重新整理。");
+      // 編譯器是 ES module，要用 import() 載入
+      let Compiler = null;
+      try {
+        const mod = await import("https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image.prod.js");
+        Compiler = mod.Compiler || (window.MINDAR && window.MINDAR.IMAGE && window.MINDAR.IMAGE.Compiler);
+      } catch (e) {
+        throw new Error("AR 元件載入失敗，請檢查網路後重新整理。（" + e.message + "）");
+      }
+      if (!Compiler) throw new Error("AR 元件載入失敗：找不到編譯器。");
       const compiler = new Compiler();
       await compiler.compileImageTargets(images, (p) => setStatus("準備圖畫辨識中… " + Math.round(p) + "%"));
       const data = await compiler.exportData();
