@@ -9,8 +9,31 @@
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 
-  <!-- 頁面設定（新增頁面請改 pages.js） -->
-  <script src="pages.js"></script>
+  <!-- 版本號：每次更新 index.html 時，Claude 會把數字加 1 -->
+  <script>
+    window.APP_VERSION = "4";
+    // 自動檢查新版：如果手機上暫存的是舊版網頁，就自動換成最新版
+    (function () {
+      try {
+        fetch(location.pathname + "?nocache=" + Date.now(), { cache: "no-store" })
+          .then(function (r) { return r.ok ? r.text() : ""; })
+          .then(function (t) {
+            var m = t.match(/APP_VERSION\s*=\s*"([^"]+)"/);
+            if (m && m[1] !== window.APP_VERSION) {
+              var u = new URL(location.href);
+              if (u.searchParams.get("v") !== m[1]) {   // 避免重複跳轉
+                u.searchParams.set("v", m[1]);
+                location.replace(u.toString());
+              }
+            }
+          })
+          .catch(function () {});
+      } catch (e) {}
+    })();
+  </script>
+
+  <!-- 頁面設定（新增頁面請改 pages.js）：每次都讀最新的設定 -->
+  <script>document.write('<script src="pages.js?t=' + Date.now() + '"><\/script>');</script>
 
   <style>
     html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #10232b; }
@@ -112,7 +135,7 @@
         const videos = PAGES.map((p, i) => {
           const v = document.createElement("video");
           v.id = "vid" + i;
-          v.src = p.video;
+          v.src = p.video + "?v=" + window.APP_VERSION;
           v.muted = true;
           v.loop = LOOP;
           v.preload = "auto";
@@ -128,7 +151,7 @@
         });
 
         // 2. 載入插畫，取得辨識資料
-        const images = await Promise.all(PAGES.map((p) => loadImage(p.image)));
+        const images = await Promise.all(PAGES.map((p) => loadImage(p.image + "?v=" + window.APP_VERSION)));
         const targetsUrl = await getTargetsUrl(images);
         await Promise.all(videos.map(waitForMetadata));
 
