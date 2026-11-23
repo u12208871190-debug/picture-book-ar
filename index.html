@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <title>繪本 AR</title>
+  <title>讓你的路動起來｜林育甄 Panay Akin</title>
 
   <!-- AR 函式庫（MindAR 開源圖像辨識 + A-Frame） -->
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
@@ -23,6 +23,7 @@
       background: #10232b; color: #f4ecdf;
     }
     #start h1 { margin: 0; font-size: 26px; font-weight: 600; letter-spacing: 0.08em; }
+    #author   { margin-top: -10px; margin-bottom: 12px; font-size: 13px; letter-spacing: 0.12em; color: #9fb5b1; }
     #start p  { margin: 0; font-size: 15px; line-height: 1.7; color: #c9d6d3; max-width: 320px; }
     #startBtn {
       margin-top: 8px; padding: 16px 44px; border: 0; border-radius: 999px;
@@ -39,7 +40,8 @@
 </head>
 <body>
   <div id="start">
-    <h1>讓繪本動起來</h1>
+    <h1>讓你的路動起來</h1>
+    <div id="author">作者：林育甄 Panay Akin</div>
     <p>按下開始後，允許使用相機，<br />再把鏡頭對準書上的圖畫。</p>
     <button id="startBtn">開始</button>
     <div id="status"></div>
