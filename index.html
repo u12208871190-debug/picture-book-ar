@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>繪本 AR</title>
+
+  <!-- AR 函式庫（MindAR 開源圖像辨識 + A-Frame） -->
+  <script src="https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/dist/mindar-image.prod.js"></script>
+  <script>
+    // 先把「圖片辨識編譯器」存起來，之後若沒有 targets.mind 檔，可以直接在手機上編譯
+    window.__MindARCompiler = (window.MINDAR && window.MINDAR.IMAGE && window.MINDAR.IMAGE.Compiler) || null;
+  </script>
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+
+  <!-- 頁面設定（新增頁面請改 pages.js） -->
+  <script src="pages.js"></script>
+
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #10232b; }
+    body { font-family: -apple-system, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif; }
+
+    #start {
+      position: fixed; inset: 0; z-index: 10;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 20px; padding: 32px; box-sizing: border-box; text-align: center;
+      background: #10232b; color: #f4ecdf;
+    }
+    #start h1 { margin: 0; font-size: 26px; font-weight: 600; letter-spacing: 0.08em; }
+    #start p  { margin: 0; font-size: 15px; line-height: 1.7; color: #c9d6d3; max-width: 320px; }
+    #startBtn {
+      margin-top: 8px; padding: 16px 44px; border: 0; border-radius: 999px;
+      background: #f4ecdf; color: #10232b; font-size: 18px; font-weight: 600; letter-spacing: 0.1em;
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+    }
+    #startBtn:disabled { opacity: 0.55; }
+    #status { min-height: 1.5em; font-size: 14px; color: #f2c38b; }
+    #hint   { font-size: 12px; color: #7f9a97; max-width: 300px; line-height: 1.6; }
+
+    /* 影片元素放在畫面外，只當作 AR 貼圖來源 */
+    #videoHolder { position: fixed; left: 0; top: 0; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
+  </style>
+</head>
+<body>
+  <div id="start">
+    <h1>讓繪本動起來</h1>
+    <p>按下開始後，允許使用相機，<br />再把鏡頭對準書上的圖畫。</p>
+    <button id="startBtn">開始</button>
+    <div id="status"></div>
+    <div id="hint">如果相機打不開，請點右上角選單，<br />選擇「用 Safari / Chrome 開啟」。</div>
+  </div>
+  <div id="videoHolder"></div>
+
+  <script>
+    const PAGES = window.PAGES || [];
+    const LOOP  = window.LOOP_VIDEO !== false;
+    const startBtn = document.getElementById("startBtn");
+    const statusEl = document.getElementById("status");
+    const setStatus = (t) => { statusEl.textContent = t; };
+
+    function loadImage(src) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error("找不到圖片：" + src));
+        img.src = src;
+      });
+    }
+
+    function waitForMetadata(video) {
+      return new Promise((resolve) => {
+        if (video.readyState >= 1) return resolve();
+        video.addEventListener("loadedmetadata", () => resolve(), { once: true });
+        setTimeout(resolve, 8000); // 網路很慢時也不要卡住
+      });
+    }
+
+    // 取得辨識資料：有 targets.mind 就直接用；沒有的話就在手機上即時編譯
+    async function getTargetsUrl(images) {
+      try {
+        const res = await fetch("targets.mind", { cache: "no-cache" });
+        if (res.ok) {
+          const buf = await res.arrayBuffer();
+          if (buf.byteLength > 0) return URL.createObjectURL(new Blob([buf]));
+        }
+      } catch (e) { /* 沒有檔案就改用即時編譯 */ }
+
+      const Compiler = window.__MindARCompiler;
+      if (!Compiler) throw new Error("AR 元件載入失敗，請檢查網路後重新整理。");
+      const compiler = new Compiler();
+      await compiler.compileImageTargets(images, (p) => setStatus("準備圖畫辨識中… " + Math.round(p) + "%"));
+      const data = await compiler.exportData();
+      return URL.createObjectURL(new Blob([data]));
+    }
+
+    startBtn.addEventListener("click", async () => {
+      startBtn.disabled = true;
+      setStatus("載入中…");
+
+      try {
+        if (!window.isSecureContext) {
+          throw new Error("必須用 https:// 網址開啟，相機才能使用。");
+        }
+
+        // 1. 建立影片（在使用者按下按鈕的當下先播一下再暫停，手機才允許之後自動播放）
+        const holder = document.getElementById("videoHolder");
+        const videos = PAGES.map((p, i) => {
+          const v = document.createElement("video");
+          v.id = "vid" + i;
+          v.src = p.video;
+          v.muted = true;
+          v.loop = LOOP;
+          v.preload = "auto";
+          v.playsInline = true;
+          v.setAttribute("playsinline", "");
+          v.setAttribute("webkit-playsinline", "");
+          v.setAttribute("muted", "");
+          v.crossOrigin = "anonymous";
+          holder.appendChild(v);
+          const pr = v.play();
+          if (pr && pr.then) pr.then(() => { v.pause(); v.currentTime = 0; }).catch(() => {});
+          return v;
+        });
+
+        // 2. 載入插畫，取得辨識資料
+        const images = await Promise.all(PAGES.map((p) => loadImage(p.image)));
+        const targetsUrl = await getTargetsUrl(images);
+        await Promise.all(videos.map(waitForMetadata));
+
+        // 3. 建立 AR 場景
+        setStatus("開啟相機中…");
+        const scene = document.createElement("a-scene");
+        scene.setAttribute("mindar-image", "imageTargetSrc: " + targetsUrl + "; maxTrack: 1; uiError: no");
+        scene.setAttribute("color-space", "sRGB");
+        scene.setAttribute("renderer", "colorManagement: true; physicallyCorrectLights: false");
+        scene.setAttribute("vr-mode-ui", "enabled: false");
+        scene.setAttribute("device-orientation-permission-ui", "enabled: false");
+
+        const cam = document.createElement("a-camera");
+        cam.setAttribute("position", "0 0 0");
+        cam.setAttribute("look-controls", "enabled: false");
+        scene.appendChild(cam);
+
+        PAGES.forEach((p, i) => {
+          const img = images[i], v = videos[i];
+          // 讓影片「蓋滿」整頁：寬度對齊書頁，比例不同時多出來的部分會超出頁面一點點
+          const pageRatio  = img.naturalHeight / img.naturalWidth;
+          const videoRatio = (v.videoWidth && v.videoHeight) ? v.videoHeight / v.videoWidth : pageRatio;
+          let w = 1, h = videoRatio;
+          if (videoRatio < pageRatio) { h = pageRatio; w = pageRatio / videoRatio; }
+
+          const target = document.createElement("a-entity");
+          target.setAttribute("mindar-image-target", "targetIndex: " + i);
+
+          const plane = document.createElement("a-video");
+          plane.setAttribute("src", "#vid" + i);
+          plane.setAttribute("width", w);
+          plane.setAttribute("height", h);
+          plane.setAttribute("position", "0 0 0.001");
+          target.appendChild(plane);
+
+          target.addEventListener("targetFound", () => { v.currentTime = 0; v.play().catch(() => {}); });
+          target.addEventListener("targetLost",  () => { v.pause(); });
+          scene.appendChild(target);
+        });
+
+        scene.addEventListener("arReady", () => {
+          document.getElementById("start").style.display = "none";
+        });
+        scene.addEventListener("arError", () => {
+          startBtn.disabled = false;
+          setStatus("相機無法開啟。請確認已允許相機權限，或改用 Safari / Chrome 開啟。");
+        });
+
+        document.body.appendChild(scene);
+      } catch (err) {
+        console.error(err);
+        startBtn.disabled = false;
+        setStatus(err.message || "發生錯誤，請重新整理再試一次。");
+      }
+    });
+  </script>
+</body>
+</html>

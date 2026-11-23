@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>產生 targets.mind（作者工具）</title>
+  <script src="https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/dist/mindar-image.prod.js"></script>
+  <script src="pages.js"></script>
+  <style>
+    body { font-family: -apple-system, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+           max-width: 560px; margin: 48px auto; padding: 0 20px; line-height: 1.8; color: #1d2b2f; }
+    button { padding: 12px 28px; font-size: 16px; border-radius: 8px; border: 0; background: #10232b; color: #fff; cursor: pointer; }
+    button:disabled { opacity: 0.5; }
+    #status { margin-top: 16px; color: #a0522d; }
+    li { font-size: 14px; }
+  </style>
+</head>
+<body>
+  <h2>產生 targets.mind（作者工具，讀者不會看到）</h2>
+  <p>頁面多了之後，讓每位讀者的手機都即時處理所有插畫會比較慢。<br />
+     在電腦上按下面的按鈕，產生一個 <b>targets.mind</b> 檔，放進網站資料夾（和 index.html 同一層），讀者開啟就會變快。</p>
+  <p>目前 pages.js 裡的頁面：</p>
+  <ol id="list"></ol>
+  <button id="btn">產生 targets.mind</button>
+  <div id="status"></div>
+
+  <script>
+    const PAGES = window.PAGES || [];
+    document.getElementById("list").innerHTML = PAGES.map(p => "<li>" + p.image + "</li>").join("");
+    const statusEl = document.getElementById("status");
+
+    const loadImage = (src) => new Promise((ok, bad) => {
+      const img = new Image();
+      img.onload = () => ok(img);
+      img.onerror = () => bad(new Error("找不到圖片：" + src));
+      img.src = src;
+    });
+
+    document.getElementById("btn").addEventListener("click", async (e) => {
+      e.target.disabled = true;
+      try {
+        const images = await Promise.all(PAGES.map(p => loadImage(p.image)));
+        const compiler = new window.MINDAR.IMAGE.Compiler();
+        await compiler.compileImageTargets(images, p => { statusEl.textContent = "處理中… " + Math.round(p) + "%"; });
+        const data = await compiler.exportData();
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(new Blob([data]));
+        a.download = "targets.mind";
+        a.click();
+        statusEl.textContent = "完成！已下載 targets.mind，請把它上傳到網站資料夾。";
+      } catch (err) {
+        statusEl.textContent = err.message;
+      }
+      e.target.disabled = false;
+    });
+  </script>
+</body>
+</html>
