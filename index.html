@@ -11,7 +11,7 @@
 
   <!-- 版本號：每次更新 index.html 時，Claude 會把數字加 1 -->
   <script>
-    window.APP_VERSION = "4";
+    window.APP_VERSION = "5";
     // 自動檢查新版：如果手機上暫存的是舊版網頁，就自動換成最新版
     (function () {
       try {
@@ -36,7 +36,8 @@
   <script>document.write('<script src="pages.js?t=' + Date.now() + '"><\/script>');</script>
 
   <style>
-    html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #10232b; }
+    /* 背景必須透明，相機拍到的真實畫面才看得到（開始畫面有自己的底色） */
+    html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: transparent; }
     body { font-family: -apple-system, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif; }
 
     #start {
