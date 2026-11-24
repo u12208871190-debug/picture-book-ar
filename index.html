@@ -11,7 +11,7 @@
 
   <!-- 版本號：每次更新 index.html 時，Claude 會把數字加 1 -->
   <script>
-    window.APP_VERSION = "6";
+    window.APP_VERSION = "7";
     // 自動檢查新版：如果手機上暫存的是舊版網頁，就自動換成最新版
     (function () {
       try {
@@ -40,23 +40,37 @@
     html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: transparent; }
     body { font-family: -apple-system, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif; }
 
+    /* 開始畫面：封面圖當背景（直式手機上整張圖完整對齊螢幕高度） */
     #start {
-      position: fixed; inset: 0; z-index: 10;
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      gap: 20px; padding: 32px; box-sizing: border-box; text-align: center;
-      background: #10232b; color: #f4ecdf;
+      position: fixed; inset: 0; z-index: 10; color: #f4ecdf;
+      background: #0b1733 url("cover.jpg") center / cover no-repeat;
     }
-    #start h1 { margin: 0; font-size: 26px; font-weight: 600; letter-spacing: 0.08em; }
-    #author   { margin-top: -10px; margin-bottom: 12px; font-size: 13px; letter-spacing: 0.12em; color: #9fb5b1; }
-    #start p  { margin: 0; font-size: 15px; line-height: 1.7; color: #c9d6d3; max-width: 320px; }
+    /* 比較寬的螢幕（平板、電腦）：圖片以高度為準完整顯示，兩側補深藍色 */
+    @media (min-aspect-ratio: 9/16) {
+      #start { background-size: auto 100%; }
+    }
+    /* 文字區塊放在標題和腳印之間（畫面約 28%～62% 的位置） */
+    #card {
+      position: absolute; left: 50%; top: 45%; transform: translate(-50%, -50%);
+      width: min(80vw, 320px); box-sizing: border-box; padding: min(2.2vh, 18px) 20px;
+      display: flex; flex-direction: column; align-items: center; gap: min(1.2vh, 10px); text-align: center;
+      background: rgba(8, 18, 40, 0.55); border-radius: 22px;
+      -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+    }
+    #start h1 { margin: 0; font-size: min(2.6vh, 21px); font-weight: 600; letter-spacing: 0.08em; }
+    #author   { margin-top: -4px; font-size: min(1.5vh, 12px); letter-spacing: 0.1em; color: #d3dccf; }
+    #start p  { margin: 2px 0 0; font-size: min(1.7vh, 14px); line-height: 1.6; color: #eef0e6; }
     #startBtn {
-      margin-top: 8px; padding: 16px 44px; border: 0; border-radius: 999px;
-      background: #f4ecdf; color: #10232b; font-size: 18px; font-weight: 600; letter-spacing: 0.1em;
+      margin-top: 2px; padding: min(1.3vh, 11px) 44px; border: 0; border-radius: 999px;
+      background: #f4ecdf; color: #10232b; font-size: min(2vh, 17px); font-weight: 600; letter-spacing: 0.1em;
       cursor: pointer; -webkit-tap-highlight-color: transparent;
     }
     #startBtn:disabled { opacity: 0.55; }
-    #status { min-height: 1.5em; font-size: 14px; color: #f2c38b; }
-    #hint   { font-size: 12px; color: #7f9a97; max-width: 300px; line-height: 1.6; }
+    #status { font-size: min(1.6vh, 13px); color: #f7cf98; }
+    #status:empty { display: none; }
+    /* 「相機打不開」提示：平常隱藏，出錯時才顯示 */
+    #hint   { display: none; font-size: 11px; color: #b9c4bd; line-height: 1.5; }
+    #card.has-error #hint { display: block; }
 
     /* 隱藏 A-Frame 內建的「VR / AR 模式」按鈕 */
     .a-enter-vr, .a-enter-ar, .a-enter-vr-button, .a-enter-ar-button { display: none !important; }
@@ -67,12 +81,14 @@
 </head>
 <body>
   <div id="start">
-    <h1>讓你的路動起來</h1>
-    <div id="author">作者：林育甄 Panay Akin</div>
-    <p>按下開始後，允許使用相機，<br />再把鏡頭對準書上的圖畫。</p>
-    <button id="startBtn">開始</button>
-    <div id="status"></div>
-    <div id="hint">如果相機打不開，請點右上角選單，<br />選擇「用 Safari / Chrome 開啟」。</div>
+    <div id="card">
+      <h1>讓你的路動起來</h1>
+      <div id="author">作者：林育甄 Panay Akin</div>
+      <p>按下開始後，允許使用相機，<br />再把鏡頭對準書上的圖畫。</p>
+      <button id="startBtn">開始</button>
+      <div id="status"></div>
+      <div id="hint">如果相機打不開，請點右上角選單，<br />選擇「用 Safari / Chrome 開啟」。</div>
+    </div>
   </div>
   <div id="videoHolder"></div>
 
@@ -200,14 +216,14 @@
           document.getElementById("start").style.display = "none";
         });
         scene.addEventListener("arError", () => {
-          startBtn.disabled = false;
+          startBtn.disabled = false; document.getElementById("card").classList.add("has-error");
           setStatus("相機無法開啟。請確認已允許相機權限，或改用 Safari / Chrome 開啟。");
         });
 
         document.body.appendChild(scene);
       } catch (err) {
         console.error(err);
-        startBtn.disabled = false;
+        startBtn.disabled = false; document.getElementById("card").classList.add("has-error");
         setStatus(err.message || "發生錯誤，請重新整理再試一次。");
       }
     });
